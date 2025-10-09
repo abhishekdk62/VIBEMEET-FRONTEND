@@ -4,7 +4,6 @@ const apiClient = axios.create({
     import.meta.env.VITE_NODE_ENV == "dev"
       ? import.meta.env.VITE_API_URL_DEV
       : import.meta.env.VITE_API_URL_PROD,
-  timeout: 10000,
 });
 apiClient.interceptors.request.use(
   (config) => {

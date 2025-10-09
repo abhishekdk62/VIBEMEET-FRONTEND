@@ -32,7 +32,6 @@ class WebRTCService {
         reconnection: true,
         reconnectionAttempts: 3,
         reconnectionDelay: 2000,
-        timeout: 20000,
       }
     );
 
