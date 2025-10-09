@@ -286,6 +286,11 @@ const VideoCall = () => {
         // Wait for join response
         console.log("⏳ Waiting for join confirmation...");
         await new Promise((resolve) => setTimeout(resolve, 2000));
+        let called = null;
+        if (!called) {
+          toast(`Please share your meeting id ${meetingId} for others to join`);
+          called = true;
+        }
 
         console.log("🎉 Meeting initialization completed successfully!");
       } catch (mediaError) {
