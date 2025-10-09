@@ -12,8 +12,8 @@ class WebRTCService {
 
     this.isAudioEnabled = true;
     this.isVideoEnabled = true;
-    this.hostMuted = false; 
-    this.hostDisabledVideo = false; 
+    this.hostMuted = false;
+    this.hostDisabledVideo = false;
   }
 
   initializeSocket(token) {
@@ -22,14 +22,19 @@ class WebRTCService {
       return this.socket;
     }
 
-    this.socket = io("http://localhost:4000", {
-      auth: { token },
-      forceNew: true,
-      reconnection: true,
-      reconnectionAttempts: 3,
-      reconnectionDelay: 2000,
-      timeout: 20000,
-    });
+    this.socket = io(
+      import.meta.env.VITE_NODE_ENV == "dev"
+        ? import.meta.env.VITE_API_URL_DEV
+        : import.meta.env.VITE_API_URL_PROD,
+      {
+        auth: { token },
+        forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: 3,
+        reconnectionDelay: 2000,
+        timeout: 20000,
+      }
+    );
 
     socketService.setSocket(this.socket);
 
@@ -569,228 +574,234 @@ class WebRTCService {
 
   // Start screen share with camera overlay (Picture-in-Picture style)
   async startScreenShareWithCamera() {
-  try {
-    console.log("🎬 Starting screen share with camera overlay...");
+    try {
+      console.log("🎬 Starting screen share with camera overlay...");
 
-    // Get screen stream
-    const screenStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { width: 1920, height: 1080 },
-      audio: true, // Screen audio
-    });
+      // Get screen stream
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { width: 1920, height: 1080 },
+        audio: true, // Screen audio
+      });
 
-    // Get camera stream (smaller resolution for overlay)
-    const cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 320, height: 240 },
-      audio: false, // Don't request new audio
-    });
+      // Get camera stream (smaller resolution for overlay)
+      const cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 320, height: 240 },
+        audio: false, // Don't request new audio
+      });
 
-    // Create canvas for compositing
-    const canvas = document.createElement("canvas");
-    canvas.width = 1920;
-    canvas.height = 1080;
-    const ctx = canvas.getContext("2d");
+      // Create canvas for compositing
+      const canvas = document.createElement("canvas");
+      canvas.width = 1920;
+      canvas.height = 1080;
+      const ctx = canvas.getContext("2d");
 
-    // Create video elements for streams
-    const screenVideo = document.createElement("video");
-    const cameraVideo = document.createElement("video");
+      // Create video elements for streams
+      const screenVideo = document.createElement("video");
+      const cameraVideo = document.createElement("video");
 
-    screenVideo.srcObject = screenStream;
-    cameraVideo.srcObject = cameraStream;
+      screenVideo.srcObject = screenStream;
+      cameraVideo.srcObject = cameraStream;
 
-    screenVideo.muted = true;
-    cameraVideo.muted = true;
+      screenVideo.muted = true;
+      cameraVideo.muted = true;
 
-    await screenVideo.play();
-    await cameraVideo.play();
+      await screenVideo.play();
+      await cameraVideo.play();
 
-    // Store animation frame ID for cleanup
-    let animationId;
+      // Store animation frame ID for cleanup
+      let animationId;
 
-    // Composite function
-    const composite = () => {
-      // Draw screen (full size)
-      ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
+      // Composite function
+      const composite = () => {
+        // Draw screen (full size)
+        ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
 
-      // Draw camera (small overlay in bottom-right corner)
-      const cameraWidth = 320;
-      const cameraHeight = 240;
-      const margin = 20;
+        // Draw camera (small overlay in bottom-right corner)
+        const cameraWidth = 320;
+        const cameraHeight = 240;
+        const margin = 20;
 
-      // Add border/shadow for camera overlay
-      ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-      ctx.fillRect(
-        canvas.width - cameraWidth - margin - 5,
-        canvas.height - cameraHeight - margin - 5,
-        cameraWidth + 10,
-        cameraHeight + 10
-      );
+        // Add border/shadow for camera overlay
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillRect(
+          canvas.width - cameraWidth - margin - 5,
+          canvas.height - cameraHeight - margin - 5,
+          cameraWidth + 10,
+          cameraHeight + 10
+        );
 
-      // Draw camera video
-      ctx.drawImage(
-        cameraVideo,
-        canvas.width - cameraWidth - margin,
-        canvas.height - cameraHeight - margin,
-        cameraWidth,
-        cameraHeight
-      );
+        // Draw camera video
+        ctx.drawImage(
+          cameraVideo,
+          canvas.width - cameraWidth - margin,
+          canvas.height - cameraHeight - margin,
+          cameraWidth,
+          cameraHeight
+        );
 
-      animationId = requestAnimationFrame(composite);
-    };
+        animationId = requestAnimationFrame(composite);
+      };
 
-    // Start compositing
-    composite();
+      // Start compositing
+      composite();
 
-    // Get composite stream
-    const compositeStream = canvas.captureStream(30); // 30 FPS
+      // Get composite stream
+      const compositeStream = canvas.captureStream(30); // 30 FPS
 
-    // ✅ CRITICAL FIX: Use EXISTING microphone audio from localStream
-    // Don't use screen audio as it won't include microphone
-    if (this.localStream && this.localStream.getAudioTracks().length > 0) {
-      const micAudioTrack = this.localStream.getAudioTracks()[0];
-      compositeStream.addTrack(micAudioTrack);
-      console.log("✅ Added existing microphone audio to composite");
-    } else {
-      console.warn("⚠️ No microphone audio track found in localStream");
-    }
-
-    // Replace video track in all peer connections
-    const videoTrack = compositeStream.getVideoTracks()[0];
-
-    for (const [socketId, peerConnection] of this.peerConnections) {
-      const sender = peerConnection
-        .getSenders()
-        .find((s) => s.track && s.track.kind === "video");
-      if (sender) {
-        try {
-          await sender.replaceTrack(videoTrack);
-          console.log(`✅ Screen+camera composite sent to ${socketId}`);
-        } catch (error) {
-          console.error(`❌ Failed to send composite to ${socketId}:`, error);
-        }
+      // ✅ CRITICAL FIX: Use EXISTING microphone audio from localStream
+      // Don't use screen audio as it won't include microphone
+      if (this.localStream && this.localStream.getAudioTracks().length > 0) {
+        const micAudioTrack = this.localStream.getAudioTracks()[0];
+        compositeStream.addTrack(micAudioTrack);
+        console.log("✅ Added existing microphone audio to composite");
+      } else {
+        console.warn("⚠️ No microphone audio track found in localStream");
       }
-      
-      // ✅ Don't replace audio track - keep using existing microphone
+
+      // Replace video track in all peer connections
+      const videoTrack = compositeStream.getVideoTracks()[0];
+
+      for (const [socketId, peerConnection] of this.peerConnections) {
+        const sender = peerConnection
+          .getSenders()
+          .find((s) => s.track && s.track.kind === "video");
+        if (sender) {
+          try {
+            await sender.replaceTrack(videoTrack);
+            console.log(`✅ Screen+camera composite sent to ${socketId}`);
+          } catch (error) {
+            console.error(`❌ Failed to send composite to ${socketId}:`, error);
+          }
+        }
+
+        // ✅ Don't replace audio track - keep using existing microphone
+      }
+
+      // Store references for cleanup
+      this.screenStream = screenStream;
+      this.cameraStream = cameraStream;
+      this.compositeCanvas = canvas;
+      this.compositeStream = compositeStream;
+      this.screenVideo = screenVideo;
+      this.cameraVideo = cameraVideo;
+      this.animationId = animationId;
+
+      // Handle screen share end
+      screenStream.getVideoTracks()[0].onended = () => {
+        this.stopScreenShareWithCamera().catch(console.error);
+      };
+
+      return { compositeStream, screenStream, cameraStream };
+    } catch (error) {
+      console.error("❌ Error starting screen share with camera:", error);
+      throw error;
     }
-
-    // Store references for cleanup
-    this.screenStream = screenStream;
-    this.cameraStream = cameraStream;
-    this.compositeCanvas = canvas;
-    this.compositeStream = compositeStream;
-    this.screenVideo = screenVideo;
-    this.cameraVideo = cameraVideo;
-    this.animationId = animationId;
-
-    // Handle screen share end
-    screenStream.getVideoTracks()[0].onended = () => {
-      this.stopScreenShareWithCamera().catch(console.error);
-    };
-
-    return { compositeStream, screenStream, cameraStream };
-  } catch (error) {
-    console.error("❌ Error starting screen share with camera:", error);
-    throw error;
   }
-}
 
+  async stopScreenShareWithCamera() {
+    try {
+      console.log("🛑 Stopping screen share with camera...");
 
-async stopScreenShareWithCamera() {
-  try {
-    console.log("🛑 Stopping screen share with camera...");
+      // Stop animation frame
+      if (this.animationId) {
+        cancelAnimationFrame(this.animationId);
+        this.animationId = null;
+      }
 
-    // Stop animation frame
-    if (this.animationId) {
-      cancelAnimationFrame(this.animationId);
-      this.animationId = null;
-    }
+      // Stop all streams
+      if (this.screenStream) {
+        this.screenStream.getTracks().forEach((track) => track.stop());
+        this.screenStream = null;
+      }
 
-    // Stop all streams
-    if (this.screenStream) {
-      this.screenStream.getTracks().forEach((track) => track.stop());
-      this.screenStream = null;
-    }
+      if (this.cameraStream) {
+        this.cameraStream.getTracks().forEach((track) => track.stop());
+        this.cameraStream = null;
+      }
 
-    if (this.cameraStream) {
-      this.cameraStream.getTracks().forEach((track) => track.stop());
-      this.cameraStream = null;
-    }
+      if (this.compositeStream) {
+        this.compositeStream.getTracks().forEach((track) => track.stop());
+        this.compositeStream = null;
+      }
 
-    if (this.compositeStream) {
-      this.compositeStream.getTracks().forEach((track) => track.stop());
-      this.compositeStream = null;
-    }
+      // Clean up video elements
+      if (this.screenVideo) {
+        this.screenVideo.srcObject = null;
+        this.screenVideo = null;
+      }
 
-    // Clean up video elements
-    if (this.screenVideo) {
-      this.screenVideo.srcObject = null;
-      this.screenVideo = null;
-    }
+      if (this.cameraVideo) {
+        this.cameraVideo.srcObject = null;
+        this.cameraVideo = null;
+      }
 
-    if (this.cameraVideo) {
-      this.cameraVideo.srcObject = null;
-      this.cameraVideo = null;
-    }
+      // Get new camera stream - PRESERVE AUDIO STATE
+      const newCameraStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
 
-    // Get new camera stream - PRESERVE AUDIO STATE
-    const newCameraStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    });
+      // CRITICAL: Set audio track state to match current state
+      if (newCameraStream.getAudioTracks().length > 0) {
+        newCameraStream.getAudioTracks()[0].enabled = this.isAudioEnabled;
+      }
+      if (newCameraStream.getVideoTracks().length > 0) {
+        newCameraStream.getVideoTracks()[0].enabled = this.isVideoEnabled;
+      }
 
-    // CRITICAL: Set audio track state to match current state
-    if (newCameraStream.getAudioTracks().length > 0) {
-      newCameraStream.getAudioTracks()[0].enabled = this.isAudioEnabled;
-    }
-    if (newCameraStream.getVideoTracks().length > 0) {
-      newCameraStream.getVideoTracks()[0].enabled = this.isVideoEnabled;
-    }
+      const videoTrack = newCameraStream.getVideoTracks()[0];
+      const audioTrack = newCameraStream.getAudioTracks()[0]; // ✅ ADD THIS
 
-    const videoTrack = newCameraStream.getVideoTracks()[0];
-    const audioTrack = newCameraStream.getAudioTracks()[0]; // ✅ ADD THIS
+      // Replace tracks in peer connections
+      for (const [socketId, peerConnection] of this.peerConnections) {
+        const senders = peerConnection.getSenders();
 
-    // Replace tracks in peer connections
-    for (const [socketId, peerConnection] of this.peerConnections) {
-      const senders = peerConnection.getSenders();
-      
-      // Replace video track
-      const videoSender = senders.find((s) => s.track && s.track.kind === "video");
-      if (videoSender) {
-        try {
-          await videoSender.replaceTrack(videoTrack);
-          console.log(`✅ Camera video restored for ${socketId}`);
-        } catch (error) {
-          console.error(`❌ Failed to restore camera for ${socketId}:`, error);
+        // Replace video track
+        const videoSender = senders.find(
+          (s) => s.track && s.track.kind === "video"
+        );
+        if (videoSender) {
+          try {
+            await videoSender.replaceTrack(videoTrack);
+            console.log(`✅ Camera video restored for ${socketId}`);
+          } catch (error) {
+            console.error(
+              `❌ Failed to restore camera for ${socketId}:`,
+              error
+            );
+          }
+        }
+
+        // ✅ CRITICAL FIX: Replace audio track too
+        const audioSender = senders.find(
+          (s) => s.track && s.track.kind === "audio"
+        );
+        if (audioSender) {
+          try {
+            await audioSender.replaceTrack(audioTrack);
+            console.log(`✅ Camera audio restored for ${socketId}`);
+          } catch (error) {
+            console.error(`❌ Failed to restore audio for ${socketId}:`, error);
+          }
         }
       }
 
-      // ✅ CRITICAL FIX: Replace audio track too
-      const audioSender = senders.find((s) => s.track && s.track.kind === "audio");
-      if (audioSender) {
-        try {
-          await audioSender.replaceTrack(audioTrack);
-          console.log(`✅ Camera audio restored for ${socketId}`);
-        } catch (error) {
-          console.error(`❌ Failed to restore audio for ${socketId}:`, error);
-        }
+      // Update local stream reference
+      if (this.localStream) {
+        this.localStream.getTracks().forEach((track) => track.stop());
       }
+      this.localStream = newCameraStream;
+
+      // Cleanup canvas
+      this.compositeCanvas = null;
+
+      // ✅ RETURN BOTH TRACKS
+      return { videoTrack, audioTrack, stream: newCameraStream };
+    } catch (error) {
+      console.error("❌ Error stopping screen share with camera:", error);
+      throw error;
     }
-
-    // Update local stream reference
-    if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => track.stop());
-    }
-    this.localStream = newCameraStream;
-
-    // Cleanup canvas
-    this.compositeCanvas = null;
-
-    // ✅ RETURN BOTH TRACKS
-    return { videoTrack, audioTrack, stream: newCameraStream };
-  } catch (error) {
-    console.error("❌ Error stopping screen share with camera:", error);
-    throw error;
   }
-}
 
   // Update your existing cleanup method
   cleanup() {
