@@ -440,7 +440,7 @@ useEffect(() => {
             aria-label="Logo"
           >
             <img
-              src={"/logo.png"}
+              src={"/logo1.png"}
               alt="Logo"
               className="sm-logo-img block h-8 w-auto object-contain"
               draggable={false}
