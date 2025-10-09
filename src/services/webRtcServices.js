@@ -24,8 +24,8 @@ class WebRTCService {
 
     this.socket = io(
       import.meta.env.VITE_NODE_ENV == "dev"
-        ? import.meta.env.VITE_API_URL_DEV
-        : import.meta.env.VITE_API_URL_PROD,
+        ? import.meta.env.VITE_SOCKET_URL_DEV
+        : import.meta.env.VITE_SOCKET_URL_PROD,
       {
         auth: { token },
         forceNew: true,
