@@ -327,7 +327,7 @@ const VideoCall = () => {
         }
         toast.error(errorMessage);
 
-        navigate("/dashboard");
+        navigate("/");
       }
     }
   };
@@ -579,7 +579,7 @@ const VideoCall = () => {
 
       onMeetingEnded: () => {
         toast("Meeting has ended!", { icon: "👏" });
-        navigate("/dashboard");
+        navigate("/");
       },
 
       onJoinedSuccessfully: () => {
@@ -589,7 +589,7 @@ const VideoCall = () => {
       onJoinError: (error) => {
         console.error("❌ Join error:", error);
         toast.error("Failed to join meeting");
-        navigate("/dashboard");
+        navigate("/");
       },
 
       onHostMutedYou: () => {
@@ -643,7 +643,7 @@ const VideoCall = () => {
 
       onRemovedFromMeeting: (data) => {
         toast("You have been removed from the meeting by the host!");
-        navigate("/dashboard");
+        navigate("/");
       },
     };
 
@@ -755,7 +755,7 @@ const VideoCall = () => {
       const userDataString = localStorage.getItem("user");
       if (!userDataString) {
         console.warn("No user data found for leave call");
-        navigate("/dashboard");
+        navigate("/");
         return;
       }
 
@@ -771,7 +771,7 @@ const VideoCall = () => {
       console.error("Error leaving meeting:", error);
     }
 
-    navigate("/dashboard");
+    navigate("/");
   };
 
   const cleanup = () => {

@@ -17,9 +17,9 @@ function App() {
     <Router>
       <div className="App">
         <Routes>
-          <Route path="/dashboard" element={<LandingPage />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/call/:meetingId" element={<VideoCall />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </Router>
