@@ -13,7 +13,6 @@ import toast from "react-hot-toast";
 const VideoCall = () => {
   const navigate = useNavigate();
   const { meetingId } = useParams();
-  // States
   const [participants, setParticipants] = useState([]);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
@@ -46,12 +45,10 @@ const VideoCall = () => {
   onNewMessage: (messageData) => {
     console.log("📨 New message received in video call:", messageData);
 
-    // Increment unread count if chat is not open
     if (!showChat) {
       setUnreadMessages((prev) => prev + 1);
     }
   };
-  // Helper function to wait for socket connection
   const waitForSocketConnection = (socket) => {
     return new Promise((resolve, reject) => {
       if (socket.connected) {
@@ -115,7 +112,6 @@ const VideoCall = () => {
     try {
       console.log("🚀 Starting meeting initialization...");
 
-      // Step 1: Get and validate localStorage data
       const token = localStorage.getItem("token");
       const userDataString = localStorage.getItem("user");
 
@@ -129,7 +125,6 @@ const VideoCall = () => {
         );
       }
 
-      // Parse user data
       let userData;
       try {
         userData = JSON.parse(userDataString);
@@ -152,7 +147,6 @@ const VideoCall = () => {
 
       console.log("👤 User ID extracted:", userId);
 
-      // Step 2: Get meeting data
       console.log("🔍 Fetching meeting data...");
       const meetingData = await getMeeting(meetingId);
 
@@ -169,7 +163,6 @@ const VideoCall = () => {
       console.log("📅 Meeting data retrieved:", meetingData);
       setMeeting(meetingData);
 
-      // Step 3: Initialize socket
       console.log("🔌 Initializing socket connection...");
       const socket = webrtcService.initializeSocket(token);
 
@@ -212,7 +205,6 @@ const VideoCall = () => {
           active: stream.active,
         });
 
-        // Verify stream is properly set in service
         if (!webrtcService.localStream) {
           console.error("❌ Stream not set in WebRTC service!");
           throw new Error(
@@ -225,7 +217,6 @@ const VideoCall = () => {
           console.log("📺 Local video element updated");
         }
 
-        // FIXED: Correct ObjectId comparison
         const isHost = meetingData.hostId._id.toString() === userId.toString();
 
         console.log("👑 Host check:", {
@@ -242,7 +233,6 @@ const VideoCall = () => {
 
         console.log("🏷️ User name resolved:", userName);
 
-        // Set current user with proper state
         const currentUserData = {
           id: userId,
           name: userName,
@@ -264,11 +254,9 @@ const VideoCall = () => {
         console.log("👤 Setting current user:", currentUserData);
         setCurrentUser(currentUserData);
 
-        // Step 5: Setup socket listeners AFTER we have the stream
         console.log("🔧 Setting up socket listeners...");
         setupSocketListeners();
 
-        // Step 6: Join the meeting
         console.log("🚪 Joining meeting...");
         const joinSuccessful = socketService.joinMeeting(
           meetingId,
@@ -283,7 +271,6 @@ const VideoCall = () => {
           );
         }
 
-        // Wait for join response
         console.log("⏳ Waiting for join confirmation...");
         await new Promise((resolve) => setTimeout(resolve, 2000));
         let called = null;
@@ -496,7 +483,6 @@ const VideoCall = () => {
       },
 
       onNewMessage: (messageData) => {
-        // Handle new message
       },
 
       onMeetingEnded: () => {
@@ -620,7 +606,6 @@ const VideoCall = () => {
     };
   };
 
-  // In your VideoCall component, update the toggle handlers:
   const handleMuteToggle = useCallback(() => {
     console.log("🔊 handleMuteToggle called");
 
@@ -629,7 +614,6 @@ const VideoCall = () => {
       return;
     }
 
-    // ADDED: Validate stream before proceeding
     if (!webrtcService.validateLocalStream()) {
       console.error("❌ Local stream validation failed");
       toast.error("Media stream not available");
@@ -715,7 +699,6 @@ const VideoCall = () => {
         const result = await webrtcService.stopScreenShareWithCamera();
         setIsScreenSharing(false);
 
-        // ✅ CRITICAL: Update local video element with new stream
         if (localVideoRef.current && result.stream) {
           localVideoRef.current.srcObject = result.stream;
           console.log("✅ Local video element updated with camera stream");

@@ -1,4 +1,4 @@
-// services/socketService.js
+
 class SocketService {
   constructor() {
     this.socket = null;
@@ -9,7 +9,6 @@ class SocketService {
     this.maxReconnectAttempts = 3;
   }
 
-  // Set socket reference (called from WebRTC service)
   setSocket(socket) {
     if (this.socket && this.socket.connected) {
       console.warn('Socket already exists and is connected');
@@ -20,7 +19,6 @@ class SocketService {
     this.setupConnectionHandlers();
   }
 
-  // Setup connection event handlers
   setupConnectionHandlers() {
     if (!this.socket) return;
 
