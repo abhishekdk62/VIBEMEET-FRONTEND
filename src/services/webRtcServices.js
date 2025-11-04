@@ -91,33 +91,46 @@ class WebRTCService {
         this.closePeerConnection(socketId);
       }
     }
-  
     const peerConnection = new RTCPeerConnection({
       iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun3.l.google.com:19302" },
+        // STUN
+        { urls: ["stun:stun.l.google.com:19302"] },
+        { urls: ["stun:stun1.l.google.com:19302"] },
+        { urls: ["stun:stun2.l.google.com:19302"] },
+        { urls: ["stun:stun3.l.google.com:19302"] },
+        { urls: ["stun:stun4.l.google.com:19302"] },
+    
+        // ✅ TURN Option 1: Metered.ca
         {
-          urls: [
-            "turn:openrelay.metered.ca:80",
-            "turn:openrelay.metered.ca:443",
-          ],
+          urls: ["turn:a.relay.metered.ca:80", "turn:a.relay.metered.ca:443"],
+          username: "d8b28b1539284ffc6a2c4667",
+          credential: "iH+R9rSH9l1tXkT2",
+        },
+    
+        // ✅ TURN Option 2: Metered.ca Backup
+        {
+          urls: ["turn:b.relay.metered.ca:80", "turn:b.relay.metered.ca:443"],
+          username: "d8b28b1539284ffc6a2c4667",
+          credential: "iH+R9rSH9l1tXkT2",
+        },
+    
+        // ✅ TURN Option 3: OpenRelay (might work)
+        {
+          urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
           username: "openrelayproject",
           credential: "openrelayproject",
         },
+    
+        // ✅ TURN Option 4: Backup OpenRelay
         {
-          urls: [
-            "turn:openrelay.metered.ca:80?transport=tcp",
-            "turn:openrelay.metered.ca:443?transport=tcp",
-          ],
+          urls: ["turn:openrelay.metered.ca:80?transport=tcp"],
           username: "openrelayproject",
           credential: "openrelayproject",
         },
       ],
       iceCandidatePoolSize: 10,
     });
-  
+    
     if (this.localStream) {
       this.localStream.getTracks().forEach((track) => {
         peerConnection.addTrack(track, this.localStream);
