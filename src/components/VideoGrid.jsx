@@ -4,20 +4,43 @@ import { MicOff, VideoOff } from 'lucide-react';
 const VideoGrid = ({ participants, isScreenSharing, onParticipantClick }) => {
   const videoRefs = useRef({});
 
-  // ✅ CRITICAL: Use useEffect to bind streams ONLY when they change
+  // ✅ FIXED: Bind streams and handle audio/video playback
   useEffect(() => {
     participants.forEach((participant) => {
-      const videoElement = videoRefs.current[participant.id];
+      const videoElement = videoRefs.current[participant.socketId || participant.id];
 
-      if (videoElement && participant.stream && participant.isVideoOn) {
-        // Only set srcObject if it's different
+      if (!videoElement) return;
+
+      // ✅ KEY FIX: Don't check isVideoOn - just check if stream exists!
+      if (participant.stream) {
         if (videoElement.srcObject !== participant.stream) {
           console.log(`🎥 Binding stream for ${participant.name}:`, {
             streamId: participant.stream.id,
             videoTracks: participant.stream.getVideoTracks().length,
             audioTracks: participant.stream.getAudioTracks().length,
           });
+
           videoElement.srcObject = participant.stream;
+
+          // ✅ FIX: Unmute for other participants to hear audio
+          if (!participant.isCurrentUser) {
+            videoElement.muted = false;
+            videoElement.volume = 1.0;
+          }
+
+          // ✅ FIX: Force play video/audio
+          videoElement
+            .play()
+            .then(() => {
+              console.log(`▶️ [${participant.name}] Video playing with audio`);
+            })
+            .catch((error) => {
+              console.warn(`⚠️ [${participant.name}] Play error:`, error.message);
+              // Retry after delay
+              setTimeout(() => {
+                videoElement.play().catch(() => {});
+              }, 500);
+            });
         }
       }
     });
@@ -41,27 +64,27 @@ const VideoGrid = ({ participants, isScreenSharing, onParticipantClick }) => {
             className="relative bg-gray-800 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all duration-200 min-h-0 min-w-0"
             onClick={() => onParticipantClick(participant)}
           >
-            {participant.isVideoOn && participant.stream ? (
+            {/* ✅ FIX: Show video element if stream exists (ignore isVideoOn) */}
+            {participant.stream ? (
               <>
                 <video
                   autoPlay
                   playsInline
-                  muted={participant.isCurrentUser}
-                  className="w-full h-full object-cover rounded-lg"
+                  muted={participant.isCurrentUser}  // ✅ Only mute self
+                  className="w-full h-full object-cover rounded-lg bg-black"
                   ref={(videoRef) => {
                     if (videoRef) {
-                      videoRefs.current[participant.id] = videoRef;
+                      videoRefs.current[participant.socketId || participant.id] = videoRef;
                     }
                   }}
                 />
-                {/* ✅ Debug: Show when video is loading */}
-                <div className="absolute inset-0 pointer-events-none">
-                  <div className="w-full h-full flex items-center justify-center text-transparent hover:text-white hover:bg-black hover:bg-opacity-50 transition-all text-xs">
-                    {!participant.stream && "Loading video..."}
-                  </div>
+                {/* Debug indicator */}
+                <div className="absolute top-2 left-2 text-xs bg-green-600 text-white px-2 py-1 rounded z-20">
+                  ✅ Stream
                 </div>
               </>
             ) : (
+              /* Only show avatar if NO stream */
               <div className="w-full h-full bg-gray-700 flex items-center justify-center">
                 <div className="text-center">
                   <div
@@ -90,7 +113,7 @@ const VideoGrid = ({ participants, isScreenSharing, onParticipantClick }) => {
                       participants.length <= 4 ? 'text-sm' : 'text-xs'
                     }`}
                   >
-                    {!participant.isVideoOn ? 'Camera off' : 'Connecting...'}
+                    Waiting for stream...
                   </div>
                 </div>
               </div>
@@ -125,14 +148,10 @@ const VideoGrid = ({ participants, isScreenSharing, onParticipantClick }) => {
                 </div>
               )}
               {!participant.isVideoOn && (
-                <div className="bg-red-600 p-1 rounded" title="Video Off">
+                <div className="bg-red--600 p-1 rounded" title="Video Off">
                   <VideoOff size={12} className="text-white" />
                 </div>
               )}
-            </div>
-
-            <div className="absolute top-12 left-2 text-xs text-gray-300 bg-black bg-opacity-50 px-1 py-0.5 rounded pointer-events-none">
-              {participant.stream ? '✅ Stream' : '⏳ No Stream'}
             </div>
           </div>
         ))}
