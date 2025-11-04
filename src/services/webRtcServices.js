@@ -76,8 +76,6 @@ class WebRTCService {
       throw error;
     }
   }
-
-  // ✅ FIXED: Removed duplicates and consolidated createPeerConnection
   createPeerConnection(socketId, isCaller = false) {
     if (this.peerConnections.has(socketId)) {
       const existing = this.peerConnections.get(socketId);
@@ -93,17 +91,13 @@ class WebRTCService {
         this.closePeerConnection(socketId);
       }
     }
-
-    // ✅ TURN SERVERS CONFIGURED
+  
     const peerConnection = new RTCPeerConnection({
       iceServers: [
-        // Google STUN servers
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
         { urls: "stun:stun2.l.google.com:19302" },
         { urls: "stun:stun3.l.google.com:19302" },
-
-        // ✅ FREE OpenRelay TURN servers
         {
           urls: [
             "turn:openrelay.metered.ca:80",
@@ -112,7 +106,6 @@ class WebRTCService {
           username: "openrelayproject",
           credential: "openrelayproject",
         },
-        // TCP fallback
         {
           urls: [
             "turn:openrelay.metered.ca:80?transport=tcp",
@@ -124,45 +117,69 @@ class WebRTCService {
       ],
       iceCandidatePoolSize: 10,
     });
-
-    // ✅ Add local stream tracks
+  
     if (this.localStream) {
       this.localStream.getTracks().forEach((track) => {
         peerConnection.addTrack(track, this.localStream);
       });
     }
-
-    // ✅ Event listeners (NOT DUPLICATED)
+  
+    // ✅ CRITICAL: ICE CANDIDATE HANDLER
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log(`🧊 [${socketId}] ICE Candidate Type: ${event.candidate.type}`, {
+          type: event.candidate.type,
+          protocol: event.candidate.protocol,
+        });
+        
+        this.socket.emit("webrtc-ice-candidate", {
+          targetSocketId: socketId,
+          candidate: event.candidate,
+        });
+      } else {
+        console.log(`🧊 [${socketId}] ICE Gathering Complete`);
+      }
+    };
+  
+    // ✅ TRACK HANDLER for receiving remote stream
+    peerConnection.ontrack = (event) => {
+      console.log(`🎬 [${socketId}] ontrack - Remote stream received`, {
+        kind: event.track.kind,
+        trackState: event.track.readyState,
+      });
+    };
+  
     peerConnection.addEventListener("signalingstatechange", () => {
       console.log(
         `[${socketId}] Signaling state: ${peerConnection.signalingState}`
       );
     });
-
+  
     peerConnection.addEventListener("connectionstatechange", () => {
       console.log(
         `[${socketId}] Connection state: ${peerConnection.connectionState}`
       );
-
+  
       if (peerConnection.connectionState === "failed") {
         console.warn(`[${socketId}] Connection failed, attempting ICE restart`);
         peerConnection.restartIce();
       }
-
+  
       if (peerConnection.connectionState === "closed") {
         this.closePeerConnection(socketId);
       }
     });
-
+  
     peerConnection.addEventListener("iceconnectionstatechange", () => {
       console.log(
         `[${socketId}] ICE connection state: ${peerConnection.iceConnectionState}`
       );
     });
-
+  
     this.peerConnections.set(socketId, peerConnection);
     return peerConnection;
   }
+  
 
   async createOffer(socketId, meetingId) {
     const peerConnection = this.peerConnections.get(socketId);
