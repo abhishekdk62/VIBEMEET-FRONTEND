@@ -22,6 +22,7 @@ const VideoCall = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [meeting, setMeeting] = useState(null);
   const [isConnecting, setIsConnecting] = useState(true);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const localVideoRef = useRef(null);
   const isInitializing = useRef(false);
@@ -41,14 +42,7 @@ const VideoCall = () => {
       }
     };
   }, [meetingId]);
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  onNewMessage: (messageData) => {
-    console.log("📨 New message received in video call:", messageData);
 
-    if (!showChat) {
-      setUnreadMessages((prev) => prev + 1);
-    }
-  };
   const waitForSocketConnection = (socket) => {
     return new Promise((resolve, reject) => {
       if (socket.connected) {
@@ -235,6 +229,7 @@ const VideoCall = () => {
 
         const currentUserData = {
           id: userId,
+          socketId: webrtcService.socket?.id,
           name: userName,
           isHost,
           isMuted: false,
@@ -242,13 +237,13 @@ const VideoCall = () => {
           hostMuted: false,
           hostDisabledVideo: false,
           isCurrentUser: true,
+          stream,
           avatar: (
             userData.firstName?.charAt(0) ||
             userData.name?.charAt(0) ||
             userData.email?.charAt(0) ||
             "U"
           ).toUpperCase(),
-          stream,
         };
 
         console.log("👤 Setting current user:", currentUserData);
@@ -273,11 +268,8 @@ const VideoCall = () => {
 
         console.log("⏳ Waiting for join confirmation...");
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        let called = null;
-        if (!called) {
-          toast(`Please share your meeting id ${meetingId} for others to join`);
-          called = true;
-        }
+        
+        toast(`Please share your meeting id ${meetingId} for others to join`);
 
         console.log("🎉 Meeting initialization completed successfully!");
       } catch (mediaError) {
@@ -326,7 +318,8 @@ const VideoCall = () => {
           error.message.includes("localStorage")
         ) {
           errorMessage += "Session expired. Please login again.";
-          localStorage.clear();
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
           navigate("/login");
           return;
         } else {
@@ -339,6 +332,87 @@ const VideoCall = () => {
     }
   };
 
+  // ✅ FIXED: mapParticipant NOW includes stream
+  const mapParticipant = (p) => {
+    return {
+      id: p.userId || p.id,
+      socketId: p.socketId,
+      name: p.userName || p.name,
+      isHost: p.isHost || false,
+      isMuted: !p.audioEnabled,
+      isVideoOn: p.videoEnabled,
+      isCurrentUser: false,
+      stream: null, // ✅ CRITICAL - will be filled by ontrack
+      avatar: (p.userName || p.name || "U")
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase(),
+    };
+  };
+
+  // ✅ FIXED: Complete setupPeerConnectionEvents with all logging
+  const setupPeerConnectionEvents = (peerConnection, socketId) => {
+    console.log(`🔧 Setting up peer connection events for ${socketId}`);
+
+    peerConnection.ontrack = (event) => {
+      console.log(`🎬 [ontrack] Remote stream received from ${socketId}:`, {
+        kind: event.track.kind,
+        trackState: event.track.readyState,
+        streamCount: event.streams.length,
+        audioTracks: event.streams[0]?.getAudioTracks().length,
+        videoTracks: event.streams[0]?.getVideoTracks().length,
+      });
+
+      if (event.streams && event.streams.length > 0) {
+        const remoteStream = event.streams[0];
+
+        console.log(`📦 Updating stream for socketId: ${socketId}`, {
+          streamId: remoteStream.id,
+          active: remoteStream.active,
+        });
+
+        setParticipants((prev) => {
+          const updated = prev.map((p) => {
+            if (p.socketId === socketId) {
+              console.log(`✅ Setting stream for ${p.name}`);
+              return { ...p, stream: remoteStream };
+            }
+            return p;
+          });
+          return updated;
+        });
+      } else {
+        console.error(`❌ No streams in ontrack event for ${socketId}`);
+      }
+    };
+
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log(`🧊 ICE Candidate from ${socketId}:`, {
+          type: event.candidate.type,
+        });
+        webrtcService.socket.emit("webrtc-ice-candidate", {
+          targetSocketId: socketId,
+          candidate: event.candidate,
+        });
+      }
+    };
+
+    peerConnection.oniceconnectionstatechange = () => {
+      console.log(
+        `🧊 ICE Connection State [${socketId}]: ${peerConnection.iceConnectionState}`
+      );
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+      console.log(
+        `🔗 Connection State [${socketId}]: ${peerConnection.connectionState}`
+      );
+    };
+  };
+
+  // ✅ FIXED: Complete setupSocketListeners with all logging
   const setupSocketListeners = () => {
     const callbacks = {
       onParticipantsList: ({ participants: serverParticipants }) => {
@@ -347,6 +421,8 @@ const VideoCall = () => {
           setIsConnecting(false);
           return;
         }
+
+        console.log("👥 Participants list received:", serverParticipants.length);
 
         const filteredParticipants = serverParticipants.filter((p) => {
           const isCurrentUser = p.socketId === webrtcService.socket?.id;
@@ -360,6 +436,8 @@ const VideoCall = () => {
 
         setParticipants(mappedParticipants);
         setIsConnecting(false);
+
+        console.log("🔗 Creating peer connections for", mappedParticipants.length);
 
         mappedParticipants.forEach((participant) => {
           if (!webrtcService.peerConnections.has(participant.socketId)) {
@@ -376,6 +454,11 @@ const VideoCall = () => {
           console.error("❌ No participant data received");
           return;
         }
+
+        console.log("➕ Participant joined:", {
+          name: participant.userName,
+          socketId: participant.socketId,
+        });
 
         const newParticipant = mapParticipant(participant);
 
@@ -396,18 +479,21 @@ const VideoCall = () => {
         });
 
         if (!webrtcService.peerConnections.has(participant.socketId)) {
+          console.log("🔗 Creating peer connection for new participant");
           const peerConnection = webrtcService.createPeerConnection(
             participant.socketId
           );
           setupPeerConnectionEvents(peerConnection, participant.socketId);
 
           setTimeout(() => {
+            console.log("📤 Creating offer for", participant.socketId);
             webrtcService.createOffer(participant.socketId, meetingId);
           }, 100);
         }
       },
 
       onParticipantLeft: ({ socketId }) => {
+        console.log("➖ Participant left:", socketId);
         setParticipants((prev) => {
           const updated = prev.filter((p) => p.socketId !== socketId);
           return updated;
@@ -417,14 +503,17 @@ const VideoCall = () => {
       },
 
       onWebRTCOffer: async ({ offer, from }) => {
+        console.log(`📥 [onWebRTCOffer] Received offer from ${from}`);
         await webrtcService.handleOffer(offer, from);
       },
 
       onWebRTCAnswer: async ({ answer, from }) => {
+        console.log(`📥 [onWebRTCAnswer] Received answer from ${from}`);
         await webrtcService.handleAnswer(answer, from);
       },
 
       onWebRTCIceCandidate: ({ candidate, from }) => {
+        console.log(`🧊 [onWebRTCIceCandidate] Received from ${from}`);
         webrtcService.handleIceCandidate(candidate, from);
       },
 
@@ -478,18 +567,18 @@ const VideoCall = () => {
         console.error("Screen share error from participant:", error);
         if (socketId === webrtcService.socket?.id) {
           toast.error("Screen sharing failed");
-          console.log(error);
         }
       },
 
       onNewMessage: (messageData) => {
+        console.log("📨 New message received in video call:", messageData);
+        if (!showChat) {
+          setUnreadMessages((prev) => prev + 1);
+        }
       },
 
       onMeetingEnded: () => {
-        toast("Meeting has ended!", {
-          icon: "👏",
-        });
-
+        toast("Meeting has ended!", { icon: "👏" });
         navigate("/dashboard");
       },
 
@@ -516,7 +605,7 @@ const VideoCall = () => {
           isMuted: true,
           hostMuted: true,
         }));
-        toast("Host has muted you!", {});
+        toast("Host has muted you!");
       },
 
       onHostUnmutedYou: () => {
@@ -524,9 +613,7 @@ const VideoCall = () => {
           ...prev,
           hostMuted: false,
         }));
-        toast("Host has given you permission to unmute!", {
-          icon: "👏",
-        });
+        toast("Host has given you permission to unmute!", { icon: "👏" });
       },
 
       onHostDisabledVideo: () => {
@@ -543,9 +630,7 @@ const VideoCall = () => {
           hostDisabledVideo: true,
         }));
 
-        toast("Host has disabled your video!", {
-          icon: "👏",
-        });
+        toast("Host has disabled your video!", { icon: "👏" });
       },
 
       onHostEnabledVideo: () => {
@@ -553,57 +638,16 @@ const VideoCall = () => {
           ...prev,
           hostDisabledVideo: false,
         }));
-        toast("Host has given you permission to turn on video!", {
-          icon: "👏",
-        });
+        toast("Host has given you permission to turn on video!", { icon: "👏" });
       },
 
       onRemovedFromMeeting: (data) => {
-        toast("You have been removed from the meeting by the host!", {
-          icon: "",
-        });
+        toast("You have been removed from the meeting by the host!");
         navigate("/dashboard");
       },
     };
 
     socketService.setupListeners(callbacks);
-  };
-
-  const setupPeerConnectionEvents = (peerConnection, socketId) => {
-    peerConnection.ontrack = (event) => {
-      const [remoteStream] = event.streams;
-      setParticipants((prev) =>
-        prev.map((p) =>
-          p.socketId === socketId ? { ...p, stream: remoteStream } : p
-        )
-      );
-    };
-
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        webrtcService.socket.emit("webrtc-ice-candidate", {
-          targetSocketId: socketId,
-          candidate: event.candidate,
-        });
-      }
-    };
-  };
-
-  const mapParticipant = (p) => {
-    return {
-      id: p.userId || p.id,
-      socketId: p.socketId,
-      name: p.userName || p.name,
-      isHost: p.isHost || false,
-      isMuted: !p.audioEnabled,
-      isVideoOn: p.videoEnabled,
-      isCurrentUser: false,
-      avatar: (p.userName || p.name || "U")
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase(),
-    };
   };
 
   const handleMuteToggle = useCallback(() => {
@@ -617,7 +661,6 @@ const VideoCall = () => {
     if (!webrtcService.validateLocalStream()) {
       console.error("❌ Local stream validation failed");
       toast.error("Media stream not available");
-
       return;
     }
 
@@ -643,16 +686,11 @@ const VideoCall = () => {
 
   const handleVideoToggle = useCallback(() => {
     console.log("handleVideoToggle called");
-    console.log("currentUser:", currentUser);
-    console.log("webrtcService.localStream:", webrtcService.localStream);
 
     if (!currentUser) {
       console.warn("No current user available");
       return;
     }
-
-    const status = webrtcService.getConnectionStatus();
-    console.log("WebRTC status:", status);
 
     if (!webrtcService.localStream) {
       console.warn("WebRTC service has no local stream");
@@ -679,6 +717,7 @@ const VideoCall = () => {
       toast.error("Host has disabled your video");
     }
   }, [currentUser, meetingId]);
+
   const handleScreenShare = async () => {
     try {
       if (!isScreenSharing) {
@@ -687,11 +726,7 @@ const VideoCall = () => {
         setIsScreenSharing(true);
 
         const userName = currentUser?.name || "You";
-        socketService.startScreenShare(
-          meetingId,
-          userName,
-          "screen-with-camera"
-        );
+        socketService.startScreenShare(meetingId);
 
         console.log("✅ Screen share with camera started");
       } else {
@@ -704,8 +739,7 @@ const VideoCall = () => {
           console.log("✅ Local video element updated with camera stream");
         }
 
-        const userName = currentUser?.name || "You";
-        socketService.stopScreenShare(meetingId, userName);
+        socketService.stopScreenShare(meetingId);
 
         console.log("✅ Screen share with camera stopped");
       }
@@ -743,6 +777,70 @@ const VideoCall = () => {
   const cleanup = () => {
     isInitializing.current = false;
     webrtcService.cleanup();
+  };
+
+  // ✅ Debug function
+  const handleDebugConnection = () => {
+    console.log("========== 🔍 FULL DEBUG ==========");
+
+    // 1. Check local stream
+    console.log("1️⃣ LOCAL STREAM:");
+    if (webrtcService.localStream) {
+      console.log("✅ Local stream exists:", {
+        id: webrtcService.localStream.id,
+        videoTracks: webrtcService.localStream.getVideoTracks().length,
+        audioTracks: webrtcService.localStream.getAudioTracks().length,
+        active: webrtcService.localStream.active,
+        videoEnabled: webrtcService.localStream.getVideoTracks()[0]?.enabled,
+        audioEnabled: webrtcService.localStream.getAudioTracks()[0]?.enabled,
+      });
+    } else {
+      console.error("❌ NO LOCAL STREAM!");
+    }
+
+    // 2. Check peer connections
+    console.log("\n2️⃣ PEER CONNECTIONS:");
+    console.log(`Total peer connections: ${webrtcService.peerConnections.size}`);
+
+    webrtcService.peerConnections.forEach((pc, socketId) => {
+      console.log(`\n🔗 Peer ${socketId}:`, {
+        connectionState: pc.connectionState,
+        iceConnectionState: pc.iceConnectionState,
+        signalingState: pc.signalingState,
+        senders: pc.getSenders().map((s) => ({
+          kind: s.track?.kind,
+          enabled: s.track?.enabled,
+          state: s.track?.readyState,
+        })),
+        receivers: pc.getReceivers().map((r) => ({
+          kind: r.track?.kind,
+          enabled: r.track?.enabled,
+          state: r.track?.readyState,
+        })),
+      });
+    });
+
+    // 3. Check participants state
+    console.log("\n3️⃣ PARTICIPANTS STATE:");
+    participants.forEach((p) => {
+      console.log(`${p.name}:`, {
+        hasStream: !!p.stream,
+        streamId: p.stream?.id,
+        videoOn: p.isVideoOn,
+        audioOn: !p.isMuted,
+        videoTracks: p.stream?.getVideoTracks().length,
+        audioTracks: p.stream?.getAudioTracks().length,
+      });
+    });
+
+    // 4. Check socket
+    console.log("\n4️⃣ SOCKET:");
+    console.log({
+      connected: webrtcService.socket?.connected,
+      socketId: webrtcService.socket?.id,
+    });
+
+    console.log("========== END DEBUG ==========");
   };
 
   if (isConnecting) {
@@ -783,6 +881,13 @@ const VideoCall = () => {
               {allParticipants.length !== 1 ? "s" : ""}
             </div>
           </div>
+
+          <button
+            onClick={handleDebugConnection}
+            className="fixed bottom-20 right-5 bg-purple-600 text-white px-4 py-2 rounded z-50"
+          >
+            🔍 Debug
+          </button>
 
           <div className="flex-1 min-h-0">
             <VideoGrid
