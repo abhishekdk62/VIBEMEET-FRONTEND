@@ -348,7 +348,7 @@ const VideoCall = () => {
         .map((n) => n[0])
         .join("")
         .toUpperCase(),
-    };
+    };  
   };
 
   // ✅ FIXED: Complete setupPeerConnectionEvents with all logging
