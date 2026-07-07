@@ -11,6 +11,31 @@ import { getMeeting, leaveMeeting } from "../services/meetingService.js";
 import { getUserId, getHostId } from "../utils/user.js";
 import toast from "react-hot-toast";
 
+const formatChatMessage = (messageData, currentSocketId) => ({
+  id: messageData.id || `${messageData.socketId}-${Date.now()}`,
+  sender: messageData.userName || "Unknown User",
+  message: messageData.message,
+  time: new Date(messageData.timestamp || Date.now()).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  }),
+  isCurrentUser: messageData.socketId === currentSocketId,
+  socketId: messageData.socketId,
+  timestamp: messageData.timestamp,
+});
+
+const isDuplicateMessage = (prev, formatted) =>
+  prev.some(
+    (msg) =>
+      msg.id === formatted.id ||
+      (msg.message === formatted.message &&
+        msg.socketId === formatted.socketId &&
+        Math.abs(
+          new Date(msg.timestamp).getTime() -
+            new Date(formatted.timestamp).getTime()
+        ) < 1000)
+  );
+
 const VideoCall = () => {
   const navigate = useNavigate();
   const { meetingId } = useParams();
@@ -24,9 +49,39 @@ const VideoCall = () => {
   const [meeting, setMeeting] = useState(null);
   const [isConnecting, setIsConnecting] = useState(true);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [chatMessages, setChatMessages] = useState([]);
 
   const localVideoRef = useRef(null);
   const isInitializing = useRef(false);
+  const showChatRef = useRef(false);
+
+  useEffect(() => {
+    showChatRef.current = showChat;
+  }, [showChat]);
+
+  const appendChatMessage = useCallback((messageData) => {
+    const socketId = webrtcService.socket?.id || socketService.socket?.id;
+    const formatted = formatChatMessage(messageData, socketId);
+
+    setChatMessages((prev) => {
+      if (isDuplicateMessage(prev, formatted)) {
+        return prev;
+      }
+      return [...prev, formatted];
+    });
+
+    if (!showChatRef.current) {
+      setUnreadMessages((prev) => prev + 1);
+    }
+  }, []);
+
+  const handleSendChatMessage = useCallback(
+    (text) => {
+      if (!currentUser?.name) return;
+      socketService.sendMessage(meetingId, text, currentUser.name);
+    },
+    [currentUser, meetingId]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -572,10 +627,7 @@ const VideoCall = () => {
       },
 
       onNewMessage: (messageData) => {
-        console.log("📨 New message received in video call:", messageData);
-        if (!showChat) {
-          setUnreadMessages((prev) => prev + 1);
-        }
+        appendChatMessage(messageData);
       },
 
       onMeetingEnded: () => {
@@ -839,8 +891,8 @@ const VideoCall = () => {
                 <ChatSidebar
                   onClose={() => setShowChat(false)}
                   currentUser={currentUser}
-                  meetingId={meetingId}
-                  socketService={socketService}
+                  messages={chatMessages}
+                  onSendMessage={handleSendChatMessage}
                 />
               )}
             </div>
