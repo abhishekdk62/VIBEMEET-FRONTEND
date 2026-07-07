@@ -6,8 +6,6 @@ const MainContent = ({
   setJoinCode,
   onCreateMeeting,
   onJoinMeeting,
-  isLoggedIn,
-  onSignIn,
 }) => {
   const handleJoinSubmit = (e) => {
     e.preventDefault();
@@ -49,21 +47,6 @@ const MainContent = ({
             </p>
           </div>
         </div>
-
-        {!isLoggedIn && (
-          <div className="mb-6 mx-auto max-w-md rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-left">
-            <p className="text-sm text-amber-900 font-medium mb-1">Sign in required</p>
-            <p className="text-xs sm:text-sm text-amber-800 mb-3">
-              Sign in with Google to start a new meeting or join one with a code.
-            </p>
-            <button
-              onClick={onSignIn}
-              className="text-sm font-medium text-blue-700 hover:text-blue-800 underline"
-            >
-              Sign in now →
-            </button>
-          </div>
-        )}
 
         <div className="flex flex-col gap-4 justify-center items-stretch sm:items-center mb-8 sm:mb-12 w-full max-w-md sm:max-w-none mx-auto">
           <button

@@ -204,8 +204,6 @@ const LandingPage = () => {
             setJoinCode={setJoinCode}
             onCreateMeeting={handleCreateMeeting}
             onJoinMeeting={handleJoinMeeting}
-            isLoggedIn={auth.isLoggedIn}
-            onSignIn={handleSignIn}
           />
         ) : currentView === "history" ? (
           <History
