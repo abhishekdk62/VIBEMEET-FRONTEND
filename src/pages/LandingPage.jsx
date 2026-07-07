@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import MainContent from "../components/MainContent";
 import AccountModal from "../components/AccountModal";
 import History from "../components/History";
@@ -9,17 +9,45 @@ import {
   joinMeeting,
 } from "../services/meetingService";
 import toast from "react-hot-toast";
-import { User } from "lucide-react";
+import { LogIn, LogOut, User } from "lucide-react";
 import StaggeredMenu from "../reactbits/Menu";
 import About from "../components/About";
+import { getUserId } from "../utils/user.js";
+
+const getAuthState = () => {
+  const token = localStorage.getItem("token");
+  const userJson = localStorage.getItem("user");
+  if (!token || !userJson) {
+    return { isLoggedIn: false, user: null, displayName: "", initial: "" };
+  }
+  try {
+    const user = JSON.parse(userJson);
+    const displayName =
+      `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+      user.email ||
+      "User";
+    const initial = user.firstName
+      ? user.firstName.charAt(0).toUpperCase()
+      : user.email
+      ? user.email.charAt(0).toUpperCase()
+      : "";
+    return { isLoggedIn: true, user, displayName, initial };
+  } catch {
+    return { isLoggedIn: false, user: null, displayName: "", initial: "" };
+  }
+};
 
 const LandingPage = () => {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [joinCode, setJoinCode] = useState("");
-  const [userInitial, setUserInitial] = useState("");
+  const [auth, setAuth] = useState(getAuthState);
   const [currentView, setCurrentView] = useState("call");
   const [meetings, setMeetings] = useState([]);
   const navigate = useNavigate();
+
+  const refreshAuth = useCallback(() => {
+    setAuth(getAuthState());
+  }, []);
 
   const menuItems = [
     {
@@ -44,30 +72,17 @@ const LandingPage = () => {
   ];
 
   useEffect(() => {
-    const userJson = localStorage.getItem("user");
-    if (userJson) {
-      try {
-        const user = JSON.parse(userJson);
-        const initial = user.firstName
-          ? user.firstName.charAt(0).toUpperCase()
-          : user.email
-          ? user.email.charAt(0).toUpperCase()
-          : "";
-        setUserInitial(initial);
-      } catch {
-        setUserInitial("");
-      }
-    }
-  }, [showAccountModal]);
+    refreshAuth();
+  }, [showAccountModal, refreshAuth]);
 
   const handleCreateMeeting = async () => {
     try {
-      const userJson = localStorage.getItem("user");
-      if (!userJson) {
-        toast.error("Please login first");
+      if (!auth.isLoggedIn) {
+        toast.error("Please sign in first");
+        setShowAccountModal(true);
         return;
       }
-      const user = userJson ? JSON.parse(userJson) : {};
+      const user = auth.user;
       const userName =
         `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
         user.email ||
@@ -87,7 +102,9 @@ const LandingPage = () => {
     try {
       const userJson = localStorage.getItem("user");
       const user = JSON.parse(userJson);
-      const data = await getMeetings(user._id);
+      const userId = getUserId(user);
+      if (!userId) return;
+      const data = await getMeetings(userId);
       setMeetings(data);
     } catch (err) {
       console.log(err);
@@ -103,59 +120,82 @@ const LandingPage = () => {
 
   const handleJoinMeeting = async () => {
     try {
-      const userJson = localStorage.getItem("user");
-      if (!userJson) {
-        toast.error("Please login first");
+      if (!auth.isLoggedIn) {
+        toast.error("Please sign in first");
+        setShowAccountModal(true);
         return;
       }
-      const res = await joinMeeting(joinCode);
-      navigate(`/call/${joinCode}`);
+      if (!joinCode.trim()) {
+        toast.error("Enter a meeting code");
+        return;
+      }
+      await joinMeeting(joinCode.trim());
+      navigate(`/call/${joinCode.trim()}`);
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Failed to join meeting");
       console.log(error);
     }
   };
 
-  const handleAccountClick = () => {
+  const handleSignIn = () => {
     setShowAccountModal(true);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("auth");
+    localStorage.removeItem("token");
     localStorage.removeItem("user");
     setShowAccountModal(false);
-    setUserInitial("");
     setMeetings([]);
-    navigate("/auth");
+    refreshAuth();
+    toast.success("Signed out successfully");
   };
 
   return (
-    <div className="min-h-screen bg-white flex relative">
-      <div
-        className="fixed top-0 left-0 z-50"
-        style={{ height: "100vh", width: "auto" }}
-      >
-        <StaggeredMenu
-          position="left"
-          items={menuItems}
-          displayItemNumbering={false}
-          menuButtonColor="#000000"
-          openMenuButtonColor="#000000"
-          changeMenuColorOnOpen={true}
-          colors={["#3B82F6", "#6366F1"]}
-          accentColor="#3B82F6"
-        />
-      </div>
+    <div className="min-h-screen bg-white flex relative overflow-x-hidden">
+      <StaggeredMenu
+        position="left"
+        isFixed={true}
+        items={menuItems}
+        displayItemNumbering={false}
+        menuButtonColor="#000000"
+        openMenuButtonColor="#000000"
+        changeMenuColorOnOpen={true}
+        colors={["#3B82F6", "#6366F1"]}
+        accentColor="#3B82F6"
+      />
 
-      <div className="flex-1 bg-gray-100 flex flex-col min-h-screen">
-        <header className="flex items-center justify-end px-6 py-4 border-b border-gray-200">
-          <button
-            onClick={handleAccountClick}
-            className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            aria-label="Open account modal"
-          >
-            {userInitial || <User size={20} />}
-          </button>
+      <div className="flex-1 bg-gray-100 flex flex-col min-h-screen min-w-0 w-full">
+        <header className="relative z-30 flex items-center justify-end gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 bg-white">
+          {auth.isLoggedIn ? (
+            <>
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0 mr-1">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                  {auth.initial || <User size={18} />}
+                </div>
+                <div className="min-w-0 hidden sm:block">
+                  <p className="text-sm font-medium text-gray-900 truncate max-w-[160px]">
+                    {auth.displayName}
+                  </p>
+                  <p className="text-xs text-gray-500">Signed in</p>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                <LogOut size={16} />
+                <span>Sign out</span>
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={handleSignIn}
+              className="flex items-center gap-2 px-4 sm:px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <LogIn size={18} />
+              <span>Sign in with Google</span>
+            </button>
+          )}
         </header>
 
         {currentView === "call" ? (
@@ -164,18 +204,25 @@ const LandingPage = () => {
             setJoinCode={setJoinCode}
             onCreateMeeting={handleCreateMeeting}
             onJoinMeeting={handleJoinMeeting}
+            isLoggedIn={auth.isLoggedIn}
+            onSignIn={handleSignIn}
           />
         ) : currentView === "history" ? (
-          <History meetings={meetings} getUserMeetings={getUserMeetings} />
+          <History
+            meetings={meetings}
+            getUserMeetings={getUserMeetings}
+            isLoggedIn={auth.isLoggedIn}
+            onSignIn={handleSignIn}
+          />
         ) : (
           <About />
         )}
       </div>
 
-      {showAccountModal && (
+      {showAccountModal && !auth.isLoggedIn && (
         <AccountModal
           onClose={() => setShowAccountModal(false)}
-          onLogout={handleLogout}
+          onLoginSuccess={refreshAuth}
           getUserMeetings={getUserMeetings}
         />
       )}

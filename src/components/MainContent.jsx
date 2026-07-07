@@ -1,10 +1,13 @@
 import React from "react";
 import Shuffle from "./../reactbits/Shuffle";
+
 const MainContent = ({
   joinCode,
   setJoinCode,
   onCreateMeeting,
   onJoinMeeting,
+  isLoggedIn,
+  onSignIn,
 }) => {
   const handleJoinSubmit = (e) => {
     e.preventDefault();
@@ -14,46 +17,58 @@ const MainContent = ({
   };
 
   return (
-    <div className="flex-1 bg-teal-100 flex items-center justify-center p-8">
-      <div className="max-w-2xl w-full text-center">
-        {/* Hero Section */}
-        <div className="mb-12">
-       <div>
-           <Shuffle
-            style={{
-              fontFamily: "'Press Start 2P', system-ui",
-
-              fontWeight: 400,
-              fontSize: "4rem",
-            }}
-            text="vibemeet"
-            shuffleDirection="right"
-            duration={1.5}
-            animationMode="evenodd"
-            shuffleTimes={1}
-            ease="power3.out"
-            stagger={0.03}
-            threshold={0.1}
-            triggerOnce={true}
-            respectReducedMotion={true}
-            loop={true}
-          />
-
-       </div>
-       <div className="pt-8">
-           <p className="text-3xl  text-gray-900 mb-4">
-            Video calls and meetings for everyone
-          </p>
-          <p className="text-lg text-gray-600 mb-8">
-            Connect, collaborate, and celebrate from anywhere with VibeMeet
-          </p>
-       </div>
+    <div className="flex-1 bg-teal-100 flex items-center justify-center p-4 sm:p-6 md:p-8">
+      <div className="max-w-2xl w-full text-center px-2 sm:px-0">
+        <div className="mb-8 sm:mb-12">
+          <div className="overflow-hidden">
+            <Shuffle
+              style={{
+                fontFamily: "'Press Start 2P', system-ui",
+                fontWeight: 400,
+                fontSize: "clamp(1.5rem, 8vw, 4rem)",
+              }}
+              text="vibemeet"
+              shuffleDirection="right"
+              duration={1.5}
+              animationMode="evenodd"
+              shuffleTimes={1}
+              ease="power3.out"
+              stagger={0.03}
+              threshold={0.1}
+              triggerOnce={true}
+              respectReducedMotion={true}
+              loop={true}
+            />
+          </div>
+          <div className="pt-6 sm:pt-8">
+            <p className="text-xl sm:text-2xl md:text-3xl text-gray-900 mb-3 sm:mb-4 px-2">
+              Video calls and meetings for everyone
+            </p>
+            <p className="text-sm sm:text-base md:text-lg text-gray-600 mb-6 sm:mb-8 px-2">
+              Connect, collaborate, and celebrate from anywhere with VibeMeet
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+        {!isLoggedIn && (
+          <div className="mb-6 mx-auto max-w-md rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-left">
+            <p className="text-sm text-amber-900 font-medium mb-1">Sign in required</p>
+            <p className="text-xs sm:text-sm text-amber-800 mb-3">
+              Sign in with Google to start a new meeting or join one with a code.
+            </p>
+            <button
+              onClick={onSignIn}
+              className="text-sm font-medium text-blue-700 hover:text-blue-800 underline"
+            >
+              Sign in now →
+            </button>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-4 justify-center items-stretch sm:items-center mb-8 sm:mb-12 w-full max-w-md sm:max-w-none mx-auto">
           <button
             onClick={onCreateMeeting}
-            className="bg-violet-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 flex items-center gap-3"
+            className="w-full sm:w-auto bg-violet-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center gap-3"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <path
@@ -67,49 +82,47 @@ const MainContent = ({
             New meeting
           </button>
 
-          {/* Join Meeting Form */}
-          <div className="flex items-center gap-3">
-            <form
-              onSubmit={handleJoinSubmit}
-              className="flex items-center gap-3"
-            >
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Enter a code or link"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value)}
-                  className="w-64 px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
-                <svg
-                  className="absolute right-3 top-3.5 h-4 w-4 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a2 2 0 012-2z"
-                  />
-                </svg>
-              </div>
-              <button
-                type="submit"
-                disabled={!joinCode.trim()}
-                className={`px-6 py-3 ${joinCode.trim()?'bg-teal-700 text-white':'bg-gray-300 text-gray-400'} text-blue-400 font-medium  hover:bg-blue-50 rounded-lg transition-all duration-200  disabled:hover:bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+          <form
+            onSubmit={handleJoinSubmit}
+            className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto"
+          >
+            <div className="relative flex-1 sm:flex-none">
+              <input
+                type="text"
+                placeholder="Enter a code or link"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value)}
+                className="w-full sm:w-64 px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+              <svg
+                className="absolute right-3 top-3.5 h-4 w-4 text-gray-400 pointer-events-none"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
               >
-                Join
-              </button>
-            </form>
-          </div>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a2 2 0 012-2z"
+                />
+              </svg>
+            </div>
+            <button
+              type="submit"
+              disabled={!joinCode.trim()}
+              className={`w-full sm:w-auto px-6 py-3 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                joinCode.trim()
+                  ? "bg-teal-700 text-white hover:bg-teal-800"
+                  : "bg-gray-300 text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              Join
+            </button>
+          </form>
         </div>
 
-      
-
-        {/* Footer Info */}
-        <div className="mt-8 text-sm text-gray-500">
+        <div className="mt-6 sm:mt-8 text-xs sm:text-sm text-gray-500">
           <p>Learn more about VibeMeet</p>
         </div>
       </div>

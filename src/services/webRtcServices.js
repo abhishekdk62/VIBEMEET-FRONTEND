@@ -1,5 +1,6 @@
 import io from "socket.io-client";
 import socketService from "./socketService.js";
+import { SOCKET_URL } from "../config/env.js";
 
 class WebRTCService {
   constructor() {
@@ -21,9 +22,7 @@ class WebRTCService {
     }
 
     this.socket = io(
-      import.meta.env.VITE_NODE_ENV == "dev"
-        ? import.meta.env.VITE_SOCKET_URL_DEV
-        : import.meta.env.VITE_SOCKET_URL_PROD,
+      SOCKET_URL,
       {
         auth: { token },
         forceNew: true,

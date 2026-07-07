@@ -17,10 +17,10 @@ const ParticipantActions = ({ participant, onAction, onClose }) => {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 bg-black/30 bg-opacity-50 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div
         ref={modalRef}
-        className="bg-white rounded-lg shadow-xl w-80 p-0 overflow-hidden"
+        className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-sm p-0 overflow-hidden max-h-[85vh] overflow-y-auto"
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200">

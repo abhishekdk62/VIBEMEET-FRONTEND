@@ -133,7 +133,7 @@ useEffect(() => {
                 key={msg.id} 
                 className={`flex ${msg.isCurrentUser ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`max-w-xs lg:max-w-md px-3 py-2 rounded-lg shadow-sm ${
+                <div className={`max-w-[85%] sm:max-w-xs lg:max-w-md px-3 py-2 rounded-lg shadow-sm ${
                   msg.isCurrentUser 
                     ? 'bg-blue-600 text-white' 
                     : 'bg-gray-100 text-gray-900 border'

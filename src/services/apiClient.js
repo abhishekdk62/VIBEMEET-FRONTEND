@@ -1,9 +1,8 @@
 import axios from "axios";
+import { API_BASE_URL } from "../config/env.js";
+
 const apiClient = axios.create({
-  baseURL:
-    import.meta.env.VITE_NODE_ENV == "dev"
-      ? import.meta.env.VITE_API_URL_DEV
-      : import.meta.env.VITE_API_URL_PROD,
+  baseURL: API_BASE_URL,
   timeout: 60000,
 });
 apiClient.interceptors.request.use(

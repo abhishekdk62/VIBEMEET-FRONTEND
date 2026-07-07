@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -8,11 +7,8 @@ import {
 import "./App.css";
 import LandingPage from "./pages/LandingPage";
 import VideoCall from "./pages/VideoCall";
-import { GoogleOAuthProvider } from "@react-oauth/google";
 
 function App() {
-
-
   return (
     <Router>
       <div className="App">

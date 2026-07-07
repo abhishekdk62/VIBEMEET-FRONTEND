@@ -8,6 +8,7 @@ import webrtcService from "../services/webRtcServices.js";
 import ParticipantActions from "../components/ParticipantActions.jsx";
 import socketService from "../services/socketService.js";
 import { getMeeting, leaveMeeting } from "../services/meetingService.js";
+import { getUserId, getHostId } from "../utils/user.js";
 import toast from "react-hot-toast";
 
 const VideoCall = () => {
@@ -130,7 +131,7 @@ const VideoCall = () => {
         );
       }
 
-      const userId = userData.id || userData._id || userData.userId;
+      const userId = getUserId(userData);
 
       if (!userId) {
         console.error("Available user data fields:", Object.keys(userData));
@@ -211,7 +212,7 @@ const VideoCall = () => {
           console.log("📺 Local video element updated");
         }
 
-        const isHost = meetingData.hostId._id.toString() === userId.toString();
+        const isHost = getHostId(meetingData.hostId) === userId.toString();
 
         console.log("👑 Host check:", {
           hostId: meetingData.hostId.toString(),
@@ -320,7 +321,7 @@ const VideoCall = () => {
           errorMessage += "Session expired. Please login again.";
           localStorage.removeItem("token");
           localStorage.removeItem("user");
-          navigate("/login");
+          navigate("/");
           return;
         } else {
           errorMessage += "Please try again.";
@@ -752,21 +753,8 @@ const VideoCall = () => {
 
   const handleLeaveCall = async () => {
     try {
-      const userDataString = localStorage.getItem("user");
-      if (!userDataString) {
-        console.warn("No user data found for leave call");
-        navigate("/");
-        return;
-      }
-
-      const userData = JSON.parse(userDataString);
-      const userId = userData.id || userData._id || userData.userId;
-
       socketService.leaveMeeting();
-
-      if (userId) {
-        await leaveMeeting(meetingId, userId);
-      }
+      await leaveMeeting(meetingId);
     } catch (error) {
       console.error("Error leaving meeting:", error);
     }
@@ -779,74 +767,10 @@ const VideoCall = () => {
     webrtcService.cleanup();
   };
 
-  // ✅ Debug function
-  const handleDebugConnection = () => {
-    console.log("========== 🔍 FULL DEBUG ==========");
-
-    // 1. Check local stream
-    console.log("1️⃣ LOCAL STREAM:");
-    if (webrtcService.localStream) {
-      console.log("✅ Local stream exists:", {
-        id: webrtcService.localStream.id,
-        videoTracks: webrtcService.localStream.getVideoTracks().length,
-        audioTracks: webrtcService.localStream.getAudioTracks().length,
-        active: webrtcService.localStream.active,
-        videoEnabled: webrtcService.localStream.getVideoTracks()[0]?.enabled,
-        audioEnabled: webrtcService.localStream.getAudioTracks()[0]?.enabled,
-      });
-    } else {
-      console.error("❌ NO LOCAL STREAM!");
-    }
-
-    // 2. Check peer connections
-    console.log("\n2️⃣ PEER CONNECTIONS:");
-    console.log(`Total peer connections: ${webrtcService.peerConnections.size}`);
-
-    webrtcService.peerConnections.forEach((pc, socketId) => {
-      console.log(`\n🔗 Peer ${socketId}:`, {
-        connectionState: pc.connectionState,
-        iceConnectionState: pc.iceConnectionState,
-        signalingState: pc.signalingState,
-        senders: pc.getSenders().map((s) => ({
-          kind: s.track?.kind,
-          enabled: s.track?.enabled,
-          state: s.track?.readyState,
-        })),
-        receivers: pc.getReceivers().map((r) => ({
-          kind: r.track?.kind,
-          enabled: r.track?.enabled,
-          state: r.track?.readyState,
-        })),
-      });
-    });
-
-    // 3. Check participants state
-    console.log("\n3️⃣ PARTICIPANTS STATE:");
-    participants.forEach((p) => {
-      console.log(`${p.name}:`, {
-        hasStream: !!p.stream,
-        streamId: p.stream?.id,
-        videoOn: p.isVideoOn,
-        audioOn: !p.isMuted,
-        videoTracks: p.stream?.getVideoTracks().length,
-        audioTracks: p.stream?.getAudioTracks().length,
-      });
-    });
-
-    // 4. Check socket
-    console.log("\n4️⃣ SOCKET:");
-    console.log({
-      connected: webrtcService.socket?.connected,
-      socketId: webrtcService.socket?.id,
-    });
-
-    console.log("========== END DEBUG ==========");
-  };
-
   if (isConnecting) {
     return (
-      <div className="h-screen w-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Connecting to meeting...</div>
+      <div className="h-screen w-screen bg-black flex items-center justify-center p-4">
+        <div className="text-white text-base sm:text-xl text-center">Connecting to meeting...</div>
       </div>
     );
   }
@@ -866,28 +790,21 @@ const VideoCall = () => {
     <div className="h-screen w-screen bg-black flex flex-col overflow-hidden">
       <video ref={localVideoRef} autoPlay muted style={{ display: "none" }} />
 
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 relative">
         <div className="flex-1 relative flex flex-col min-w-0">
-          <div className="flex justify-between items-center p-2 bg-black bg-opacity-50 text-white text-xs z-10">
-            <div className="bg-black bg-opacity-50 px-2 py-1 rounded">
+          <div className="flex justify-between items-center p-1.5 sm:p-2 bg-black bg-opacity-50 text-white text-[10px] sm:text-xs z-10 gap-2">
+            <div className="bg-black bg-opacity-50 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded truncate min-w-0">
               {new Date().toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
               })}{" "}
-              | {meetingId}
+              | <span className="truncate max-w-[100px] sm:max-w-none inline-block align-bottom">{meetingId}</span>
             </div>
-            <div className="bg-black bg-opacity-50 px-2 py-1 rounded">
+            <div className="bg-black bg-opacity-50 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded flex-shrink-0">
               {allParticipants.length} participant
               {allParticipants.length !== 1 ? "s" : ""}
             </div>
           </div>
-
-          <button
-            onClick={handleDebugConnection}
-            className="fixed bottom-20 right-5 bg-purple-600 text-white px-4 py-2 rounded z-50"
-          >
-            🔍 Debug
-          </button>
 
           <div className="flex-1 min-h-0">
             <VideoGrid
@@ -900,24 +817,34 @@ const VideoCall = () => {
         </div>
 
         {(showParticipants || showChat) && (
-          <div className="w-80 bg-white border-l border-gray-200 flex-shrink-0">
-            {showParticipants && (
-              <ParticipantsSidebar
-                participants={allParticipants}
-                currentUser={currentUser}
-                onClose={() => setShowParticipants(false)}
-                onParticipantAction={handleParticipantAction}
-              />
-            )}
-            {showChat && (
-              <ChatSidebar
-                onClose={() => setShowChat(false)}
-                currentUser={currentUser}
-                meetingId={meetingId}
-                socketService={socketService}
-              />
-            )}
-          </div>
+          <>
+            <div
+              className="fixed inset-0 bg-black/60 z-40 md:hidden"
+              onClick={() => {
+                setShowParticipants(false);
+                setShowChat(false);
+              }}
+              aria-hidden="true"
+            />
+            <div className="fixed inset-x-0 bottom-0 top-14 z-50 md:relative md:inset-auto md:top-auto md:w-80 md:max-w-[85vw] lg:max-w-none bg-white border-t md:border-t-0 md:border-l border-gray-200 flex-shrink-0 flex flex-col shadow-2xl md:shadow-none">
+              {showParticipants && (
+                <ParticipantsSidebar
+                  participants={allParticipants}
+                  currentUser={currentUser}
+                  onClose={() => setShowParticipants(false)}
+                  onParticipantAction={handleParticipantAction}
+                />
+              )}
+              {showChat && (
+                <ChatSidebar
+                  onClose={() => setShowChat(false)}
+                  currentUser={currentUser}
+                  meetingId={meetingId}
+                  socketService={socketService}
+                />
+              )}
+            </div>
+          </>
         )}
       </div>
 

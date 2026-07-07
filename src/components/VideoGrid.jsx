@@ -48,16 +48,16 @@ const VideoGrid = ({ participants, isScreenSharing, onParticipantClick }) => {
 
   const getGridClass = (count) => {
     if (count === 1) return 'grid-cols-1';
-    if (count === 2) return 'grid-cols-2';
-    if (count <= 4) return 'grid-cols-2 grid-rows-2';
-    if (count <= 6) return 'grid-cols-3 grid-rows-2';
-    if (count <= 9) return 'grid-cols-3 grid-rows-3';
-    return 'grid-cols-4 grid-rows-3';
+    if (count === 2) return 'grid-cols-1 sm:grid-cols-2';
+    if (count <= 4) return 'grid-cols-2';
+    if (count <= 6) return 'grid-cols-2 sm:grid-cols-3';
+    if (count <= 9) return 'grid-cols-2 sm:grid-cols-3';
+    return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4';
   };
 
   return (
-    <div className="h-full w-full p-2">
-      <div className={`grid gap-2 h-full w-full ${getGridClass(participants.length)}`}>
+    <div className="h-full w-full p-1 sm:p-2">
+      <div className={`grid gap-1 sm:gap-2 h-full w-full auto-rows-fr ${getGridClass(participants.length)}`}>
         {participants.map((participant) => (
           <div
             key={participant.socketId || participant.id}
@@ -78,10 +78,6 @@ const VideoGrid = ({ participants, isScreenSharing, onParticipantClick }) => {
                     }
                   }}
                 />
-                {/* Debug indicator */}
-                <div className="absolute top-2 left-2 text-xs bg-green-600 text-white px-2 py-1 rounded z-20">
-                  ✅ Stream
-                </div>
               </>
             ) : (
               /* Only show avatar if NO stream */
@@ -135,7 +131,7 @@ const VideoGrid = ({ participants, isScreenSharing, onParticipantClick }) => {
             )}
 
             {/* Participant Name */}
-            <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs z-10">
+            <div className="absolute bottom-1 sm:bottom-2 left-1 sm:left-2 bg-black bg-opacity-60 text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs z-10 max-w-[80%] truncate">
               {participant.name}
               {participant.isCurrentUser && ' (You)'}
             </div>
@@ -148,7 +144,7 @@ const VideoGrid = ({ participants, isScreenSharing, onParticipantClick }) => {
                 </div>
               )}
               {!participant.isVideoOn && (
-                <div className="bg-red--600 p-1 rounded" title="Video Off">
+                <div className="bg-red-600 p-1 rounded" title="Video Off">
                   <VideoOff size={12} className="text-white" />
                 </div>
               )}

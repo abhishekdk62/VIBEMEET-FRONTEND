@@ -186,23 +186,21 @@ class SocketService {
     });
   }
 
-sendMessage(meetingId, message, userName) {
-  if (!this.validateConnection(meetingId)) return;
-  
-  const messageData = {
-    meetingId,
-    message: message.trim(),
-    userName,
-    socketId: this.socket.id,
-    timestamp: new Date().toISOString(),
-    id: `${this.socket.id}-${Date.now()}-${Math.random()}` // Unique ID
-  };
-  
-  console.log('📤 Sending message via socket:', messageData);
-  this.socket.emit('send-message', messageData);
-  return messageData;
-}
+  sendMessage(meetingId, message, userName) {
+    if (!this.validateConnection(meetingId)) return;
 
+    const messageData = {
+      meetingId,
+      message: message.trim(),
+      userName,
+      socketId: this.socket.id,
+      timestamp: new Date().toISOString(),
+      id: `${this.socket.id}-${Date.now()}-${Math.random()}`,
+    };
+
+    this.socket.emit('send-message', messageData);
+    return messageData;
+  }
 
   // HOST CONTROL METHODS
   hostMuteParticipant(meetingId, targetSocketId) {
@@ -390,22 +388,6 @@ sendMessage(meetingId, message, userName) {
       }
     });
   }
-// In your socketService.js, add this method:
-sendMessage(meetingId, message, userName) {
-  if (!this.validateConnection(meetingId)) return;
-  
-  const messageData = {
-    meetingId,
-    message: message.trim(),
-    userName,
-    socketId: this.socket.id,
-    timestamp: new Date().toISOString(),
-    id: Date.now() + Math.random() // Simple ID generation
-  };
-  
-  this.socket.emit('send-message', messageData);
-  return messageData; // Return for immediate UI update
-}
 
   // Remove all listeners
   removeListeners() {
