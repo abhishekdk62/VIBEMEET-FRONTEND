@@ -26,10 +26,7 @@ const About = () => {
           {/* About the Developer */}
           <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-gray-300">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">About the Developer</h2>
-            
-            <p className="text-sm sm:text-base text-gray-800 leading-relaxed mb-6">
-              Hi! I'm <span className="font-semibold">Abhishek D K</span>, an <span className="font-semibold">MCA graduate</span> and passionate Frontend Developer with hands-on experience building responsive, high-performance web applications using the modern React ecosystem. I specialize in <span className="font-semibold">React.js, Next.js, and TypeScript</span> with expertise in component architecture, state management, and pixel-perfect UI implementation. I'm proficient in CSS frameworks like <span className="font-semibold">Tailwind CSS and Bootstrap</span>, third-party library integration, and creating seamless user experiences with real-time features. My experience extends to performance optimization, responsive design principles, modern development workflows, and collaborative frontend development using Git and Agile methodologies.
-            </p>
+    
 
             {/* Card on left with text wrapping on right */}
             <div className="mb-6 flex flex-col md:block">
